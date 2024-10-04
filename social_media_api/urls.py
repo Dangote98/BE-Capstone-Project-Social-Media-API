@@ -17,13 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from django.shortcuts import redirect
+from social.views import home_redirect  # Import the home_redirect function
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),  # Admin panel
     path('api/', include('social.urls')),  # Include your social app's URLs (posts, profiles, etc.)
     path('login/', auth_views.LoginView.as_view(), name='login'),  # Login URL
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # Logout URL
-    path('signup/', include('social.urls')),  # Add signup path for user registration
+    path('signup/', include('social.urls')),  # Add signup path for user 
+    path('', home_redirect, name='home_redirect'),
 ]
 
 

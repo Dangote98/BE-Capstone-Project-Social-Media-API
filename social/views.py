@@ -7,6 +7,25 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Post, Profile, Follow
 from .serializers import PostSerializer, ProfileSerializer, FollowSerializer
 from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth import login
+from django.shortcuts import redirect
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+
+def home_redirect(request):
+    return redirect('login')
+
+def signup(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)  # Automatically log the user in after signup
+            return redirect('posts')  # Redirect to the posts or homepage
+    else:
+        form = UserCreationForm()
+    return render(request, 'registration/signup.html', {'form': form})
+
 
 # Custom pagination for posts
 class FeedPagination(PageNumberPagination):
@@ -95,13 +114,13 @@ class ProfileViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
-# Function-based view for user sign-up
-def signup(request):
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('login')  # Redirect to login after successful signup
-    else:
-        form = UserCreationForm()
-    return render(request, 'registration/signup.html', {'form': form})
+class PostUpdateView(generics.UpdateAPIView):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        post = super().get_object()
+        if post.user != self.request.user:
+            raise PermissionDenied("You can only update your own posts.")
+        return post
