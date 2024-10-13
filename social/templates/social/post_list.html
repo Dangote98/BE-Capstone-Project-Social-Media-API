@@ -2,15 +2,19 @@
     <div class="post">
         <p>{{ post.content }}</p>
         <p><strong>Posted by:</strong> {{ post.user.username }}</p>
-        <p><strong>Timestamp:</strong> {{ post.timestamp }}</p>
+        <p><strong>Timestamp:</strong> {{ post.timestamp|date:"F j, Y, g:i a" }}</p> <!-- Formatting the timestamp for better readability -->
 
-        <!-- Show the Edit button only for the post owner -->
+        <!-- Show the Edit and Delete buttons only for the post owner -->
         {% if post.user == request.user %}
-            <a href="{% url 'post_update' post.id %}" class="btn btn-primary">Edit</a>
-            <form action="{% url 'post_delete' post.id %}" method="POST">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
+            <div class="post-actions"> <!-- Added a wrapper for actions -->
+                <a href="{% url 'post_update' post.id %}" class="btn btn-primary">Edit</a>
+                <form action="{% url 'post_delete' post.id %}" method="POST" style="display: inline;"> <!-- Inline to prevent block display -->
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
         {% endif %}
     </div>
+{% empty %} <!-- Added empty case to handle when there are no posts -->
+    <p>No posts available.</p>
 {% endfor %}

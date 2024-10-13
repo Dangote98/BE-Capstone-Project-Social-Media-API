@@ -1,31 +1,33 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, generics
 from rest_framework.response import Response
-from django.contrib.auth.models import User
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404, render, redirect
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.models import User
 from rest_framework.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required
 from .models import Post, Profile, Follow
 from .serializers import PostSerializer, ProfileSerializer, FollowSerializer
-from rest_framework.pagination import PageNumberPagination
-from django.contrib.auth import login
-from django.shortcuts import redirect
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
 
+# Redirect to admin or login depending on user authentication status
 def home_redirect(request):
+    if request.user.is_authenticated:
+        return redirect('/admin/')  # Redirect authenticated users to admin page
     return redirect('login')
 
+# Signup view
 def signup(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
             login(request, user)  # Automatically log the user in after signup
-            return redirect('posts')  # Redirect to the posts or homepage
+            return redirect('posts')  # Redirect to posts or homepage
     else:
         form = UserCreationForm()
     return render(request, 'registration/signup.html', {'form': form})
-
 
 # Custom pagination for posts
 class FeedPagination(PageNumberPagination):
@@ -33,6 +35,11 @@ class FeedPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100  # Optional limit on the maximum page size
 
+# View for displaying posts
+@login_required
+def posts(request):
+    posts = Post.objects.all().order_by('-timestamp')  # Display posts in reverse chronological order
+    return render(request, 'social/posts.html', {'posts': posts})
 
 # ViewSet for handling Post creation, updates, and deletion
 class PostViewSet(viewsets.ModelViewSet):
@@ -42,9 +49,9 @@ class PostViewSet(viewsets.ModelViewSet):
     pagination_class = FeedPagination
 
     def get_queryset(self):
-        # Only show posts from users that the current user follows
         user = self.request.user
         followed_users = user.following.values_list('following', flat=True)
+        # Show posts from users the current user follows, or their own posts
         return Post.objects.filter(user__in=followed_users).order_by('-timestamp')
 
     def perform_create(self, serializer):
@@ -69,7 +76,6 @@ class PostViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only delete your own posts.")
         post.delete()
         return Response({"message": "Post deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-
 
 # ViewSet for handling following/unfollowing users
 class FollowViewSet(viewsets.ViewSet):
@@ -100,7 +106,6 @@ class FollowViewSet(viewsets.ViewSet):
         following_users = [follow.following.username for follow in follows]
         return Response({"following": following_users}, status=status.HTTP_200_OK)
 
-
 # ViewSet for managing user profiles
 class ProfileViewSet(viewsets.ModelViewSet):
     queryset = Profile.objects.all()
@@ -113,7 +118,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
+# Post update view
 class PostUpdateView(generics.UpdateAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
